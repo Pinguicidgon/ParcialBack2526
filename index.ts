@@ -1,182 +1,129 @@
-import express, {
-  type NextFunction,
-  type Request,
-  type Response,
-} from "express";
-import cors from "cors";
+import express, { type Request, type Response } from "express";
+import axios from "axios";
 
-// Tipos
-type Calle = {
-  numero: number;
-  streetName: string;
-  floor: number;
+type LD = {
+  id: number;
+  filmName: string;
+  rotationType: "CAV" | "CLV";
+  region: string;
+  lengthMinutes: number;
+  videoFormat: "NTSC" | "PAL";
 };
 
-type Person = {
-  id: string;
-  name: string;
-  email: string;
-  address: Calle;
-};
-
-// "Base de datos" simulada
-let personicas: Person[] = [
+let laserDiscs: LD[] = [
   {
-    id: "1",
-    name: "Paco",
-    email: "pacoPe@pepe.com",
-    address: {
-      floor: 1,
-      numero: 155,
-      streetName: "Capitan Haya",
-    },
+    id: 1,
+    filmName: "Blade Runner",
+    rotationType: "CAV",
+    region: "US",
+    lengthMinutes: 117,
+    videoFormat: "NTSC",
   },
   {
-    id: "2",
-    name: "Pepa",
-    email: "pepaPe@gmail.com",
-    address: {
-      floor: 3,
-      numero: 155,
-      streetName: "Capitan Haya",
-    },
+    id: 2,
+    filmName: "Terminator 2",
+    rotationType: "CLV",
+    region: "EU",
+    lengthMinutes: 137,
+    videoFormat: "PAL",
   },
 ];
 
+//  Servidor Express
 const app = express();
 const port = 3000;
 
-app.use(cors());
 app.use(express.json());
 
-// --- Función de validación ---
-const validatePersonData = (data: any): string | null => {
-  if (!data) return "No se ha proporcionado ningún cuerpo de solicitud.";
-
-  const { name, email, address } = data;
-
-  if (typeof name !== "string" || name.trim().length < 2)
-    return "El nombre debe ser una cadena con al menos 2 caracteres.";
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (typeof email !== "string" || !emailRegex.test(email))
-    return "El correo electrónico no es válido.";
-
-  if (
-    !address ||
-    typeof address.numero !== "number" ||
-    typeof address.floor !== "number" ||
-    typeof address.streetName !== "string"
-  ) {
-    return "La dirección debe incluir número (number), floor (number) y streetName (string).";
-  }
-
-  return null;
-};
-
-// --- Middleware de error genérico ---
-const errorHandler = (
-  err: Error,
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  console.error("Error detectado:", err.message);
-  res
-    .status(500)
-    .json({ error: "Error interno del servidor", detail: err.message });
-};
-
 // --- Rutas ---
-app.get("/", (req: Request, res: Response) => {
-  res.send("✅ Okey makei, te has conectado correctamente.");
+// Mostrar todos los discos
+app.get("/ld", (_req: Request, res: Response) => {
+  res.json(laserDiscs);
 });
 
-app.get("/persons", (req: Request, res: Response) => {
-  res.json(personicas);
+// Mostrar un disco por su ID
+app.get("/ld/:id", (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  const found = laserDiscs.find((x) => x.id === id);
+  return found
+    ? res.json(found)
+    : res.status(404).json({ message: "Equipo no encontrado" });
 });
 
-app.get("/person/:id", (req: Request, res: Response) => {
-  const { id } = req.params;
-  const person = personicas.find((p) => p.id === id);
-
-  return person
-    ? res.json(person)
-    : res.status(404).json({ error: "Persona no encontrada" });
-});
-
-app.post("/person", (req: Request, res: Response) => {
+// Guardar un nuevo disco
+app.post("/ld", (req: Request, res: Response) => {
   try {
-    const error = validatePersonData(req.body);
-    if (error) return res.status(400).json({ error });
-
-    const newUser: Person = {
-      id: Date.now().toString(),
+    const nuevo: LD = {
+      id: Date.now(), // id simple
       ...req.body,
     };
-
-    personicas.push(newUser);
-    res.status(201).json(newUser);
+    laserDiscs.push(nuevo);
+    res.status(201).json(nuevo);
   } catch (err: any) {
-    res
-      .status(500)
-      .json({ error: "Error al crear la persona", detail: err.message });
+    res.status(500).json({ message: "Error al crear el disco", detail: err.message });
   }
 });
 
-app.put("/person/:id", (req: Request, res: Response) => {
+// Eliminar un disco
+app.delete("/ld/:id", (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const index = personicas.findIndex((p) => p.id === id);
+    const id = Number(req.params.id);
+    const exists = laserDiscs.some((x) => x.id === id);
+    if (!exists) return res.status(404).json({ message: "Equipo no encontrado" });
 
-    if (index === -1)
-      return res.status(404).json({ error: "Persona no encontrada" });
-
-    const error = validatePersonData(req.body);
-    if (error) return res.status(400).json({ error });
-
-    personicas[index] = { ...personicas[index], ...req.body };
-
-    res.json({
-      message: "Persona actualizada correctamente",
-      person: personicas[index],
-    });
+    laserDiscs = laserDiscs.filter((x) => x.id !== id);
+    res.json({ message: "Disco eliminado correctamente" });
   } catch (err: any) {
-    res
-      .status(500)
-      .json({ error: "Error al actualizar la persona", detail: err.message });
+    res.status(500).json({ message: "Error al eliminar el disco", detail: err.message });
   }
 });
-
-app.delete("/person/:id", (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const exists = personicas.some((p) => p.id === id);
-
-    if (!exists)
-      return res.status(404).json({ error: "Persona no encontrada" });
-
-    personicas = personicas.filter((p) => p.id !== id);
-
-    res.json({ message: "Persona eliminada correctamente" });
-  } catch (err: any) {
-    res
-      .status(500)
-      .json({ error: "Error al eliminar la persona", detail: err.message });
-  }
-});
-
-// Middleware final (ruta no encontrada)
-app.use((req: Request, res: Response) => {
-  res.status(404).json({ error: "Ruta no encontrada" });
-});
-
-// Middleware de error
-app.use(errorHandler);
 
 // --- Inicio del servidor ---
 app.listen(port, () => {
-  console.log(`🚀 Server started at http://localhost:${port}`);
+  console.log(`🚀 Servidor en http://localhost:${port}`);
+
+  // Esperar 1 segundo
+  setTimeout(testApi, 1000);
 });
 
-//Prueba
+// Cliente haciendo las llamadas
+async function testApi() {
+  try {
+    // 1) Obtener todos los discos
+    const listaInicial = await axios.get<LD[]>("http://localhost:3000/ld");
+    console.log("Lista inicial:");
+    console.log(listaInicial.data);
+
+    // 2) Crear un nuevo disco
+    const nuevoDiscoData = {
+      filmName: "Jurassic Park",
+      rotationType: "CAV" as const,
+      region: "US",
+      lengthMinutes: 127,
+      videoFormat: "NTSC" as const,
+    };
+    const creado = await axios.post<LD>("http://localhost:3000/ld", nuevoDiscoData);
+    console.log("Creado:");
+    console.log(creado.data);
+
+    // 3) Volver a obtener todos
+    const listaConNuevo = await axios.get<LD[]>("http://localhost:3000/ld");
+    console.log("Lista tras crear:");
+    console.log(listaConNuevo.data);
+
+    // 4) Eliminar el creado
+    await axios.delete(`http://localhost:3000/ld/${creado.data.id}`);
+    console.log("Eliminado id:", creado.data.id);
+
+    // 5) Lista final
+    const listaFinal = await axios.get<LD[]>("http://localhost:3000/ld");
+    console.log("Lista final:");
+    console.log(listaFinal.data);
+  } catch (err) {
+    if (axios.isAxiosError(err)) {
+      console.log("Axios error:", err.message);
+    } else {
+      console.log("Error:", err);
+    }
+  }
+}
