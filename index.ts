@@ -1,3 +1,6 @@
+//Hecho por Raúl Cid González
+//Me he basado en el último ejercicio que hicimos con la misma estructura escrita.
+
 import express, { type Request, type Response } from "express";
 import axios from "axios";
 
@@ -54,7 +57,7 @@ app.get("/ld/:id", (req: Request, res: Response) => {
 app.post("/ld", (req: Request, res: Response) => {
   try {
     const nuevo: LD = {
-      id: Date.now(), // id simple
+      id: Date.now(),
       ...req.body,
     };
     laserDiscs.push(nuevo);
